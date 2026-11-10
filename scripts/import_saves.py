@@ -109,11 +109,12 @@ def get(f, path):
 def mkdirs(f, path):
     cur = ""
     for part in path.strip("/").split("/"):
-        cur += "/" + part
+        parent, cur = cur or "/", cur + "/" + part
         try:
             f.mkd(cur)
-        except ftplib.all_errors:
-            pass
+        except ftplib.all_errors as e:
+            if not any(n == part and t == "dir" for n, t, _ in ls(f, parent)):
+                sys.exit("Ordner %s laesst sich auf der PS5 nicht anlegen: %s" % (cur, str(e).strip()))
 
 
 def rmtree(f, path):
