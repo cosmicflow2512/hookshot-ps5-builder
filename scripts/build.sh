@@ -130,6 +130,11 @@ stage_lift() {
     rm -rf "$HS/work/game"
     (cd "$HS" && python3 -I nx2/nup.py "$nup" --only exefs --extract work/game)
     log "Liften: ARM64 -> C (nx2/lift.py --standalone --write)"
+    # Wie nx2/make_game.py (Upstream-Builder): lift.py schreibt die Chunk-Grenzen nach <work>/image/chunks.txt,
+    # legt den Ordner aber nicht selbst an. Lifted C einer frueheren Lift-Runde vorher entfernen (Upstream #1176).
+    mkdir -p "$HS/work/lift/image"
+    find "$HS/work/lift/sa/gen" -maxdepth 1 -type f -name 'code_*' \
+        \( -name '*.c' -o -name '*.c.whole' -o -name '*.part' \) -delete 2>/dev/null || true
     (cd "$HS" && OOT_WORK="$HS/work/lift" python3 -I nx2/lift.py --standalone --write \
         --exefs "$HS/work/game/exefs" --work "$HS/work/lift")
     [[ -f $HS/work/lift/sa/gen/a64_table.c ]] || die "Lift hat work/lift/sa/gen/a64_table.c nicht erzeugt"
