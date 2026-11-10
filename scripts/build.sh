@@ -1,27 +1,24 @@
 #!/usr/bin/env bash
-# hookshot-ps5-builder: die Pipeline in Stufen.
+# hookshot-ps5-builder: baut PS5_Hookshot mit dessen offiziellem ps5/build-title.sh.
 #
-#   build.sh update      Repos klonen bzw. auf den neuesten Stand ziehen (immer der aktuelle main)
-#   build.sh toolchain   PS5-Payload-SDK, native Tool, libc.prx, RADV (release), FFmpeg, zstd, Header
-#   build.sh lift        exefs aus der .nup holen und nach C liften (nx2/lift.py)
-#   build.sh build       PPSA99024 kompilieren und linken (ps5/build.py)
-#   build.sh deploy      dist/PPSA99024 per FTP auf die PS5 (scripts/deploy.py)
-#   build.sh all         update + toolchain + lift + build (+ deploy bei AUTO_DEPLOY=true)
+#   build.sh update   PS5_Hookshot auf HOOKSHOT_REF (Standard: neuestes ps5-v*-Release), die anderen Repos auf die
+#                     Revisionen, die build-title.sh dieses Stands pinnt ("played with on a console")
+#   build.sh build    ps5/build-title.sh <nup> --jobs N: Toolchain, RADV, Lift, Kompilieren, Linken -> dist/PPSA99024
+#   build.sh deploy   dist/PPSA99024 per FTP auf die PS5 (scripts/deploy.py)
+#   build.sh all      update + build (+ deploy bei AUTO_DEPLOY=true)
 #
-# Alles liegt unter $CONFIG_DIR (Standard /config): src/ (die Repos nebeneinander, wie die Skripte
-# der Projekte es erwarten), logs/. Spieldateien werden nirgends hin kopiert ausser nach
-# src/PS5_Hookshot/work und dist (lokal, von git ignoriert).
+# Alles liegt unter $CONFIG_DIR/src (die Repos nebeneinander, wie build-title.sh es erwartet).
 set -euo pipefail
 
 CONFIG_DIR=${CONFIG_DIR:-/config}
 NUP_DIR=${NUP_DIR:-/nup}
 SRC="$CONFIG_DIR/src"
 HS="$SRC/PS5_Hookshot"
-VK="$SRC/PS5_Vulkan"
-TPL="$SRC/PS5_VulkanTemplate"
-MESA="$SRC/PS5_Mesa"
-# ps5/build.py startet seine Compiler ohne Speicherbremse (der PC-Builder nx2/build.py hat eine, MemoryGate, und rechnet
-# ~1,5 GB je Compiler, die grossen Chunks deutlich mehr). Standard hier: Kerne minus 2, aber hoechstens
+GH=https://github.com/mihawk-99
+REF=${HOOKSHOT_REF:-latest}
+
+# ps5/build.py startet seine Compiler ohne Speicherbremse; build-title.sh rechnet 2 GB je Compiler ("ten at once took
+# 14 GB at their peak"), nimmt dafuer aber den gesamten RAM des Hosts. Hier: Kerne minus 2, hoechstens
 # (freier RAM bzw. Speicherlimit des Containers, das kleinere) / 4 GB.
 default_jobs() {
     local cpu=$(( $(nproc) > 2 ? $(nproc) - 2 : 1 )) avail limit mem
@@ -36,91 +33,59 @@ default_jobs() {
     echo $(( cpu < mem ? cpu : mem ))
 }
 JOBS=${JOBS:-$(default_jobs)}
-GH=https://github.com/mihawk-99
 
 log() { printf '\n==> [%s] %s\n' "$(date '+%H:%M:%S')" "$*"; }
 die() { printf '\nFEHLER: %s\n' "$*" >&2; exit 1; }
 
-# Repos, die voll geklont werden (sie pinnen Revisionen untereinander, deshalb komplette Historie)
-FULL_REPOS=(PS5_Hookshot PS5_Vulkan PS5_VulkanTemplate PS5_PayloadSDK PS5_MihawkGen)
-
-update_repo() {   # name
-    local dir="$SRC/$1"
-    if [[ -d $dir/.git ]]; then
-        git -C "$dir" fetch -q --tags origin
-        local branch
-        branch=$(git -C "$dir" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
-        [[ -n $branch ]] || branch=main
-        git -C "$dir" checkout -q "$branch"
-        git -C "$dir" reset -q --hard "origin/$branch"
-    else
-        git clone -q "$GH/$1.git" "$dir"
+ensure_repo() {   # name revision [--shallow]
+    local name=$1 rev=$2 dir="$SRC/$1"
+    if [[ ! -d $dir/.git ]]; then
+        if [[ ${3:-} == --shallow ]]; then
+            git init -q "$dir" && git -C "$dir" remote add origin "$GH/$name.git"
+        else
+            git clone -q "$GH/$name.git" "$dir"
+        fi
     fi
-    printf '  %-20s %s  %s\n' "$1" "$(git -C "$dir" rev-parse --short HEAD)" \
-        "$(git -C "$dir" log -1 --format='%ad %s' --date=short | cut -c1-80)"
+    if ! git -C "$dir" cat-file -e "$rev^{commit}" 2>/dev/null; then
+        if [[ ${3:-} == --shallow ]]; then
+            git -C "$dir" fetch -q --depth 1 origin "$rev"
+        else
+            git -C "$dir" fetch -q --tags origin
+        fi
+    fi
+    git -C "$dir" -c advice.detachedHead=false checkout -q --force --detach "$rev"
+    printf '  %-20s %s  %s\n' "$name" "${rev:0:7}" "$(git -C "$dir" log -1 --format='%ad %s' --date=short "$rev" | cut -c1-80)"
+}
+
+pin() {   # NAME_REV aus build-title.sh des aktuellen PS5_Hookshot-Stands
+    sed -n "s/^$1=\([0-9a-f]\{40\}\).*/\1/p" "$HS/ps5/build-title.sh"
 }
 
 stage_update() {
-    log "Repos aktualisieren (neuester Stand von $GH)"
+    log "PS5_Hookshot holen ($GH/PS5_Hookshot)"
     mkdir -p "$SRC"
-    for r in "${FULL_REPOS[@]}"; do update_repo "$r"; done
-    # PS5_Mesa ist ein Mesa-Fork (sehr grosse Historie): nur die Revision, die PS5_Vulkan pinnt.
-    local pin
-    pin=$(sed -n 's/^mesa_revision=\${PS5_MESA_REVISION:-\([0-9a-f]\{40\}\)}.*/\1/p' "$VK/tools/build-radv.sh")
-    [[ -n $pin ]] || die "Mesa-Pin in PS5_Vulkan/tools/build-radv.sh nicht gefunden"
-    if [[ ! -d $MESA/.git ]]; then
-        git init -q "$MESA"
-        git -C "$MESA" remote add origin "$GH/PS5_Mesa.git"
+    [[ -d $HS/.git ]] || git clone -q "$GH/PS5_Hookshot.git" "$HS"
+    git -C "$HS" fetch -q --tags --force origin
+    local ref=$REF
+    if [[ $ref == latest ]]; then
+        ref=$(git -C "$HS" tag -l 'ps5-v*' --sort=-v:refname | head -1)
+        [[ -n $ref ]] || die "kein ps5-v*-Release-Tag gefunden (HOOKSHOT_REF=main setzen)"
+    elif [[ $ref == main ]]; then
+        ref=origin/main
     fi
-    if ! git -C "$MESA" cat-file -e "$pin^{commit}" 2>/dev/null; then
-        log "PS5_Mesa: Revision ${pin:0:12} holen"
-        git -C "$MESA" fetch -q --depth 1 origin "$pin"
-    fi
-    git -C "$MESA" checkout -q --detach "$pin"
-    printf '  %-20s %s  (Pin aus PS5_Vulkan)\n' PS5_Mesa "${pin:0:7}"
-}
+    git -C "$HS" -c advice.detachedHead=false checkout -q --force --detach "$ref"
+    printf '  %-20s %s  %s  (%s)\n' PS5_Hookshot "$(git -C "$HS" rev-parse --short HEAD)" \
+        "$(git -C "$HS" log -1 --format='%ad %s' --date=short | cut -c1-80)" "$ref"
+    [[ -f $HS/ps5/build-title.sh ]] || die "$ref hat kein ps5/build-title.sh"
 
-stage_toolchain() {
-    [[ -d $HS/.git && -d $VK/.git ]] || stage_update
-    log "Toolchain (PS5_VulkanTemplate/ps5/tools/bootstrap.sh)"
-    # bootstrap.sh zaehlt eine fehlende Konsolenadresse als offenen Punkt; die Adresse
-    # braucht hier nur das Deploy, deshalb ein Eintrag, damit der Rest durchlaeuft.
-    [[ -f $VK/.env ]] || printf 'PS5_HOST=%s\nFTP_PORT=%s\n' "${PS5_HOST:-0.0.0.0}" "${PS5_FTP_PORT:-2121}" > "$VK/.env"
-    local out
-    out=$(mktemp)
-    if ! (cd "$TPL" && bash ps5/tools/bootstrap.sh) 2>&1 | tee "$out"; then
-        # ps5vkctl (Steuer-Payload fuer Testlaeufe) braucht der Build nicht; alles andere schon.
-        if grep -E '^  missing ' "$out" | grep -v -q 'control payload'; then
-            rm -f "$out"; die "bootstrap.sh hat offene Punkte (siehe oben)"
-        fi
-    fi
-    rm -f "$out"
-    [[ -f $VK/.deps/native/radv-release/lib/libvulkan_radeon.ps5.a ]] || die "RADV-Release-Archiv fehlt"
-    [[ -x $VK/build/host/ps5-native-tool && -f $VK/runtime/libc.prx ]] || die "ps5-native-tool oder libc.prx fehlt"
-
-    log "Vulkan-, SPIR-V- und VMA-Header (Versionen aus PS5_Hookshot/scripts/linux/deps.sh)"
-    local cpm="$HS/.local/ps5-deps/cpm" dl="$HS/.local/ps5-deps/downloads" vkh spv vma
-    vkh=$(sed -n 's/^VK_HEADERS=\(.*\)$/\1/p' "$HS/scripts/linux/deps.sh")
-    spv=$(sed -n 's/^SPIRV_HEADERS=\(.*\)$/\1/p' "$HS/scripts/linux/deps.sh")
-    vma=$(sed -n 's/^VMA=\(.*\)$/\1/p' "$HS/scripts/linux/deps.sh")
-    [[ -n $vkh && -n $spv && -n $vma ]] || die "Header-Versionen in scripts/linux/deps.sh nicht gefunden"
-    mkdir -p "$cpm" "$dl"
-    get_headers() {   # repo tag name
-        [[ -d $cpm/$3/$2 ]] && { echo "  $3 $2: vorhanden"; return 0; }
-        curl -fsSL --retry 5 --proto '=https' -o "$dl/$3-$2.tar.gz" "https://github.com/$1/archive/refs/tags/$2.tar.gz"
-        mkdir -p "$cpm/$3/$2"
-        tar -xzf "$dl/$3-$2.tar.gz" -C "$cpm/$3/$2" --strip-components=1
-        echo "  $3 $2"
-    }
-    get_headers KhronosGroup/Vulkan-Headers "$vkh" vulkanheaders
-    get_headers KhronosGroup/SPIRV-Headers "$spv" spirv-headers
-    get_headers GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator "$vma" vulkanmemoryallocator
-
-    log "FFmpeg + dav1d fuer die Konsole (ps5/tools/build-ffmpeg.sh)"
-    (cd "$HS" && bash ps5/tools/build-ffmpeg.sh)
-    log "zstd fuer die Konsole (ps5/tools/build-zstd.sh)"
-    (cd "$HS" && bash ps5/tools/build-zstd.sh)
-    log "Toolchain fertig"
+    log "Abhaengigkeiten auf die Revisionen aus ps5/build-title.sh"
+    local v m s g
+    v=$(pin VULKAN_REV) m=$(pin MESA_REV) s=$(pin SDK_REV) g=$(pin MIHAWKGEN_REV)
+    [[ -n $v && -n $m && -n $s && -n $g ]] || die "Pins in ps5/build-title.sh nicht gefunden"
+    ensure_repo PS5_Vulkan "$v"
+    ensure_repo PS5_PayloadSDK "$s"
+    ensure_repo PS5_MihawkGen "$g"
+    ensure_repo PS5_Mesa "$m" --shallow
 }
 
 find_nup() {
@@ -135,35 +100,15 @@ find_nup() {
     echo "$found"
 }
 
-stage_lift() {
-    [[ -d $HS/.git ]] || stage_update
+stage_build() {
+    [[ -f $HS/ps5/build-title.sh ]] || stage_update
     local nup
     nup=$(find_nup)
-    log "Spiel: $nup"
-    (cd "$HS" && python3 -I nx2/nup.py "$nup")
-    log "exefs extrahieren (nx2/nup.py --only exefs)"
-    rm -rf "$HS/work/game"
-    (cd "$HS" && python3 -I nx2/nup.py "$nup" --only exefs --extract work/game)
-    log "Liften: ARM64 -> C (nx2/lift.py --standalone --write)"
-    # Wie nx2/make_game.py (Upstream-Builder): lift.py schreibt die Chunk-Grenzen nach <work>/image/chunks.txt,
-    # legt den Ordner aber nicht selbst an. Lifted C einer frueheren Lift-Runde vorher entfernen (Upstream #1176).
-    mkdir -p "$HS/work/lift/image"
-    find "$HS/work/lift/sa/gen" -maxdepth 1 -type f -name 'code_*' \
-        \( -name '*.c' -o -name '*.c.whole' -o -name '*.part' \) -delete 2>/dev/null || true
-    (cd "$HS" && OOT_WORK="$HS/work/lift" python3 -I nx2/lift.py --standalone --write \
-        --exefs "$HS/work/game/exefs" --work "$HS/work/lift")
-    [[ -f $HS/work/lift/sa/gen/a64_table.c ]] || die "Lift hat work/lift/sa/gen/a64_table.c nicht erzeugt"
-    log "Lift fertig"
-}
-
-stage_build() {
-    [[ -f $HS/work/lift/sa/gen/a64_table.c ]] || stage_lift
-    log "PPSA99024 kompilieren und linken (ps5/build.py --jobs $JOBS)"
-    (cd "$HS" && OOT_WORK="$HS/work/lift" python3 -I ps5/build.py --jobs "$JOBS")
+    log "ps5/build-title.sh $(basename "$nup") --jobs $JOBS  (PS5_Hookshot $(git -C "$HS" describe --tags --always))"
+    echo "  Teilschritte loggen nach $HS/work/build-title/*.log, bei Fehlern stehen die letzten 30 Zeilen hier."
+    (cd "$HS" && bash ps5/build-title.sh "$nup" --jobs "$JOBS")
     [[ -f $HS/dist/PPSA99024/eboot.bin ]] || die "dist/PPSA99024/eboot.bin fehlt nach dem Build"
-    log "Fertig: $HS/dist/PPSA99024"
-    du -sh "$HS/dist/PPSA99024"
-    ls -la "$HS/dist/PPSA99024"
+    log "Fertig: $HS/dist/PPSA99024 ($(du -sh "$HS/dist/PPSA99024" | cut -f1))"
 }
 
 stage_deploy() {
@@ -174,30 +119,20 @@ stage_deploy() {
     python3 -I /app/scripts/deploy.py "${args[@]}"
 }
 
-check_space() {
-    local free
-    free=$(df -Pk "$CONFIG_DIR" | awk 'NR==2 {print int($4/1024/1024)}')
-    if (( free < 60 )); then
-        echo "WARNUNG: nur ${free} GB frei unter $CONFIG_DIR, Upstream nennt ~60 GB fuer den Build"
-    fi
-}
-
 stage=${1:-all}
 mkdir -p "$CONFIG_DIR"
-echo "Image: ${IMAGE_REV:0:7}  Jobs: $JOBS  RAM frei: $(awk '/^MemAvailable:/ {print int($2/1024/1024)}' /proc/meminfo) GB  Container-Limit: $(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo ?)"
-check_space
+IMAGE_REV=${IMAGE_REV:-unbekannt}
+echo "Image: ${IMAGE_REV:0:7}  Ref: $REF  Jobs: $JOBS  RAM frei: $(awk '/^MemAvailable:/ {print int($2/1024/1024)}' /proc/meminfo) GB  Container-Limit: $(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo ?)"
+free=$(df -Pk "$CONFIG_DIR" | awk 'NR==2 {print int($4/1024/1024)}')
+(( free >= 60 )) || echo "WARNUNG: nur ${free} GB frei unter $CONFIG_DIR, Upstream nennt ~60 GB fuer den Build"
 case $stage in
     update) stage_update ;;
-    toolchain) stage_toolchain ;;
-    lift) stage_lift ;;
-    build) stage_build ;;
+    build|toolchain|lift) stage_build ;;
     deploy) stage_deploy ;;
     all)
         stage_update
-        stage_toolchain
-        stage_lift
         stage_build
         if [[ ${AUTO_DEPLOY:-false} == true ]]; then stage_deploy; fi
         ;;
-    *) die "unbekannte Stufe: $stage (update|toolchain|lift|build|deploy|all)" ;;
+    *) die "unbekannte Stufe: $stage (update|build|deploy|all)" ;;
 esac

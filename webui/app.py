@@ -13,7 +13,7 @@ CONFIG = os.environ.get("CONFIG_DIR", "/config")
 LOGS = os.path.join(CONFIG, "logs")
 HS = os.path.join(CONFIG, "src", "PS5_Hookshot")
 PORT = int(os.environ.get("WEBUI_PORT", "8484"))
-STAGES = ("all", "update", "toolchain", "lift", "build", "deploy")
+STAGES = ("all", "update", "build", "deploy")
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 state = {"proc": None, "stage": None, "started": None, "ended": None, "code": None, "log": None}
@@ -62,7 +62,8 @@ def git_rev(name):
         return None
     r = subprocess.run(["git", "-C", d, "log", "-1", "--format=%h %ad %s", "--date=short"],
                        capture_output=True, text=True)
-    return r.stdout.strip()[:90] or None
+    t = subprocess.run(["git", "-C", d, "describe", "--tags", "--exact-match"], capture_output=True, text=True).stdout.strip()
+    return ((t + " ") if t else "") + r.stdout.strip()[:90] or None
 
 
 def status():
@@ -77,8 +78,7 @@ def status():
     s["ps5_host"] = os.environ.get("PS5_HOST", "")
     eboot = os.path.join(HS, "dist", "PPSA99024", "eboot.bin")
     s["build"] = time.strftime("%d.%m.%Y %H:%M", time.localtime(os.path.getmtime(eboot))) if os.path.exists(eboot) else None
-    s["repos"] = {n: git_rev(n) for n in ("PS5_Hookshot", "PS5_Vulkan", "PS5_VulkanTemplate", "PS5_PayloadSDK",
-                                          "PS5_MihawkGen", "PS5_Mesa")}
+    s["repos"] = {n: git_rev(n) for n in ("PS5_Hookshot", "PS5_Vulkan", "PS5_PayloadSDK", "PS5_MihawkGen", "PS5_Mesa")}
     st = os.statvfs(CONFIG)
     s["free_gb"] = round(st.f_bavail * st.f_frsize / (1 << 30), 1)
     return s

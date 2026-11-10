@@ -3,7 +3,11 @@
     deploy.py --dist <dist/PPSA99024> [--upload-nup <spiel.nup>]
 
 Umgebung: PS5_HOST, PS5_FTP_PORT (2121), PS5_TITLE_DIR (/data/homebrew/PPSA99024),
-PS5_NUP_PATH (/data/prosperoeden/roms/oot/oot.nup, der Pfad, den Hookshot ohne HOS_PS5_NUP liest).
+PS5_NUP_PATH (/data/prosperoeden/roms/oot/oot.nup): Ziel fuer UPLOAD_NUP.
+
+Hookshot liest die romfs aus der .nup an festen Orten: ps5-v0.1.0-beta.1 nur /data/prosperoeden/roms/oot/oot.nup, neuere
+Staende zuerst /data/lichii/roms/oot/oot.nup (host/ps5/win32_ps5.c hos_ps5_nup). HOS_PS5_NUP in hookshot_env.txt wirkt
+nicht: die Datei nimmt keine Werte mit "/" an (host/hos_main.c env_line_allowed).
 
 Hochgeladen wird nur, was sich seit dem letzten Deploy auf denselben Host geaendert hat (SHA-1 je Datei in
 $CONFIG_DIR/deploy-manifest.json). Geloescht wird auf der Konsole nichts: user/ (Spielstaende), hookshot_options.ini
@@ -20,6 +24,7 @@ import sys
 import time
 
 DEFAULT_NUP = "/data/prosperoeden/roms/oot/oot.nup"
+KNOWN_NUPS = ("/data/lichii/roms/oot/oot.nup", DEFAULT_NUP)
 
 
 def connect(host, port):
@@ -149,7 +154,7 @@ def main():
             json.dump(manifest, fh, indent=1)
     print("  %d von %d Dateien hochgeladen, Rest unveraendert" % (uploaded, len(files)), flush=True)
 
-    set_env_line(f, title_dir, "HOS_PS5_NUP", "" if nup_path == DEFAULT_NUP else nup_path)
+    set_env_line(f, title_dir, "HOS_PS5_NUP", "")   # (frueher gesetzt, wirkt nicht: aufraeumen)
 
     if a.upload_nup:
         size = os.path.getsize(a.upload_nup)
@@ -172,11 +177,15 @@ def main():
                 put_file(f, a.upload_nup, nup_path, 0)
             if remote_size(f, nup_path) not in (None, size):
                 sys.exit("  .nup auf der PS5 hat nicht die erwartete Groesse")
+    found = [p for p in KNOWN_NUPS if remote_size(f, p)]
+    if found:
+        print("  .nup fuer Hookshot: %s%s" % (found[0], "" if DEFAULT_NUP in found else
+              " (liest erst der Stand nach ps5-v0.1.0-beta.1; das Release sucht nur %s)" % DEFAULT_NUP), flush=True)
     else:
-        have = remote_size(f, nup_path)
-        if have is None:
-            print("  HINWEIS: auf der PS5 liegt keine .nup unter %s. Hookshot liest die romfs von dort "
-                  "(UPLOAD_NUP=true laedt sie hoch)." % nup_path, flush=True)
+        print("  ACHTUNG: keine .nup unter %s. Ohne sie stuerzt Hookshot beim Start ab (SIGSEGV).\n"
+              "  Eine vorhandene .nup verschieben (Lichii findet sie dort weiter, jeder Name unter roms/ geht):\n"
+              "    curl -Q 'MKD /data/prosperoeden/roms/oot' -Q 'RNFR <alter Pfad>' -Q 'RNTO %s' ftp://%s:%d/\n"
+              "  oder UPLOAD_NUP=true setzen." % (" bzw. ".join(KNOWN_NUPS), DEFAULT_NUP, host, port), flush=True)
     f.quit()
     print("  Deploy fertig. Start ueber ShadowMountPlus (%s)." % title_dir, flush=True)
 

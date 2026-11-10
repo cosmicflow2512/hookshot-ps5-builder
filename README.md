@@ -9,16 +9,11 @@ Im Image sind weder Spieldateien noch Keys oder Builds. Es enthält nur die Buil
 
 ## Was er macht
 
-| Stufe | Inhalt | Quelle |
-| --- | --- | --- |
-| update | PS5_Hookshot, PS5_Vulkan, PS5_VulkanTemplate, PS5_PayloadSDK und PS5_MihawkGen auf den neuesten `main`, PS5_Mesa auf die Revision, die PS5_Vulkan pinnt | GitHub, mihawk-99 |
-| toolchain | Payload-SDK, `ps5-native-tool`, `libc.prx`, RADV-Release-Archiv, glm (`ps5/tools/bootstrap.sh` von PS5_VulkanTemplate); Vulkan-, SPIR-V- und VMA-Header in den Versionen aus `scripts/linux/deps.sh`; FFmpeg/dav1d und zstd für die Konsole | die Skripte der Projekte selbst |
-| lift | `nx2/nup.py --only exefs`, `nx2/lift.py --standalone --write` | `docs/PS5.md` |
-| build | `ps5/build.py`, also kompilieren und mit RADV zu `dist/PPSA99024` linken (mit PS5_MihawkGen-Frame-Generation) | `docs/PS5.md` |
-| deploy | `dist/PPSA99024` nach `/data/homebrew/PPSA99024`, nur geänderte Dateien; optional die `.nup` | FTP, Port 2121 |
-
-Die erste Toolchain-Stufe dauert lange, vor allem wegen RADV (Mesa). Danach werden nur noch die Teile neu gebaut, die
-sich geändert haben.
+| Stufe | Inhalt |
+| --- | --- |
+| update | PS5_Hookshot auf `HOOKSHOT_REF` (Standard `latest`: das neueste `ps5-v*`-Release), PS5_Vulkan, PS5_Mesa, PS5_PayloadSDK und PS5_MihawkGen auf die Revisionen, die `ps5/build-title.sh` dieses Stands pinnt |
+| build | das offizielle `ps5/build-title.sh <nup> --jobs N`: SDK, native Tool, libc.prx, RADV, Header, Lift, FFmpeg, zstd, Kompilieren und Linken zu `dist/PPSA99024` |
+| deploy | `dist/PPSA99024` nach `/data/homebrew/PPSA99024`, nur geänderte Dateien; prüft, ob die `.nup` dort liegt, wo Hookshot sie sucht |
 
 ## Voraussetzungen
 
@@ -27,9 +22,12 @@ sich geändert haben.
   (siehe Upstream-README).
 - Eine PS5 mit Homebrew-Umgebung. PS5_Vulkan wurde mit etaHEN, ShadowMountPlus (startet Titles unter
   `/data/homebrew`) und ftpsrv auf Port 2121 getestet.
-- Die romfs liest Hookshot auf der Konsole direkt aus der `.nup`. Standardpfad ist
-  `/data/prosperoeden/roms/oot/oot.nup`, einen anderen Pfad setzt `PS5_NUP_PATH`. Mit `UPLOAD_NUP=true` kopiert das
-  Deploy die Datei dorthin. Das ist fortsetzbar und wird übersprungen, wenn sie schon vollständig dort liegt.
+- Die romfs liest Hookshot auf der Konsole direkt aus der `.nup`, und zwar nur an festen Orten:
+  `ps5-v0.1.0-beta.1` unter `/data/prosperoeden/roms/oot/oot.nup`, neuere Stände zuerst unter
+  `/data/lichii/roms/oot/oot.nup`. `HOS_PS5_NUP` in `hookshot_env.txt` wirkt nicht, weil die Datei keine Pfade annimmt.
+  Fehlt die Datei dort, stürzt das Title beim Start mit SIGSEGV ab. Eine `.nup` von PS5_Lichii lässt sich per FTP
+  dorthin verschieben, Lichii findet sie unter jedem Namen in `roms/`. Mit `UPLOAD_NUP=true` kopiert das Deploy die
+  Datei nach `PS5_NUP_PATH`, fortsetzbar.
 
 ## Installation (Unraid)
 
@@ -57,7 +55,8 @@ starten, `ps5/build.py` kompiliert nur, was fehlt.
 | `NUP_FILE` | leer | Pfad der `.nup` im Container. Leer heißt: erste `.nup` mit `0400486024DEC000` im Namen unter `/nup` |
 | `PS5_HOST` | leer | IP der PS5 |
 | `PS5_FTP_PORT` | `2121` | FTP-Port |
-| `PS5_NUP_PATH` | `/data/prosperoeden/roms/oot/oot.nup` | Pfad der `.nup` auf der PS5. Weicht er ab, wird `HOS_PS5_NUP` in `hookshot_env.txt` gesetzt |
+| `HOOKSHOT_REF` | `latest` | `latest` = neuestes `ps5-v*`-Release, `main` = Entwicklungsstand, oder ein Tag/Commit |
+| `PS5_NUP_PATH` | `/data/prosperoeden/roms/oot/oot.nup` | Ziel für `UPLOAD_NUP` |
 | `UPLOAD_NUP` | `false` | `.nup` beim Deploy mitkopieren |
 | `AUTO_DEPLOY` | `false` | nach „Alles bauen“ automatisch deployen |
 | `RUN_ON_START` | `false` | beim Containerstart sofort bauen |
@@ -65,7 +64,7 @@ starten, `ps5/build.py` kompiliert nur, was fehlt.
 | `FORCE_DEPLOY` | `false` | alle Dateien neu hochladen |
 
 Kommandozeile ohne Web-UI: `docker exec -it hookshot-ps5-builder /app/scripts/build.sh all` (oder `update`,
-`toolchain`, `lift`, `build`, `deploy`).
+`build`, `deploy`).
 
 ## Stand von PS5_Hookshot
 
