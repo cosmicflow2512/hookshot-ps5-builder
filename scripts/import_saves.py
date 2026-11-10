@@ -117,6 +117,52 @@ def mkdirs(f, path):
                 sys.exit("Ordner %s laesst sich auf der PS5 nicht anlegen: %s" % (cur, str(e).strip()))
 
 
+def chmod(f, mode, path):
+    try:
+        f.sendcmd("CHMOD %s %s" % (mode, path))   # (ftpsrv: CHMOD <mode> <path>)
+        return True
+    except ftplib.all_errors:
+        return False
+
+
+def writable(f, path):
+    probe = path + "/.import-probe"
+    try:
+        f.mkd(probe)
+        f.rmd(probe)
+        return True
+    except ftplib.all_errors:
+        return False
+
+
+def make_target_writable(f):
+    """Hookshot legt user/save/<uid> als Spielprozess an; ftpsrv darf darin dann nichts anlegen (550 Permission denied).
+    Erst CHMOD versuchen, sonst user/ beiseite legen (PPSA99024/ hat das Deploy per FTP angelegt, dort darf ftpsrv
+    umbenennen) und user/save/<uid> neu anlegen, offen fuer beide (777)."""
+    global HOOKSHOT_SAVE
+    title = HOOKSHOT_SAVE.rsplit("/", 3)[0]
+    mkdirs(f, HOOKSHOT_SAVE)
+    if writable(f, HOOKSHOT_SAVE):
+        return
+    for p in (title + "/user", title + "/user/save", HOOKSHOT_SAVE):
+        chmod(f, "777", p)
+    if writable(f, HOOKSHOT_SAVE):
+        print("Rechte von Hookshots Save-Ordner per CHMOD geoeffnet", flush=True)
+        return
+    old = title + "/user.vor-import-" + time.strftime("%Y%m%d-%H%M%S")
+    try:
+        f.rename(title + "/user", old)
+    except ftplib.all_errors as e:
+        sys.exit("Hookshots Save-Ordner ist fuer ftpsrv schreibgeschuetzt und laesst sich nicht beiseite legen: %s" %
+                 str(e).strip())
+    print("Hookshots user/ war fuer ftpsrv schreibgeschuetzt: beiseite gelegt als %s, neu angelegt" % old, flush=True)
+    mkdirs(f, HOOKSHOT_SAVE)
+    for p in (title + "/user", title + "/user/save", HOOKSHOT_SAVE):
+        chmod(f, "777", p)
+    if not writable(f, HOOKSHOT_SAVE):
+        sys.exit("%s ist auch neu angelegt nicht beschreibbar" % HOOKSHOT_SAVE)
+
+
 def rmtree(f, path):
     for name, t, _ in ls(f, path):
         p = path + "/" + name
@@ -188,7 +234,8 @@ def main():
     if old:
         print("Backup des Hookshot-Saves (%d Dateien): %s" % (len(old), backup), flush=True)
 
-    mkdirs(f, HOOKSHOT_SAVE)
+    make_target_writable(f)
+    tgt = ls(f, HOOKSHOT_SAVE)
     for name, t, _ in tgt:
         if t == "dir" and name.startswith("slot_"):
             rmtree(f, HOOKSHOT_SAVE + "/" + name)
@@ -196,11 +243,15 @@ def main():
     for s in slots:
         for rel in tree_files(f, src + "/" + s):
             data = get(f, src + "/" + s + "/" + rel)
-            mkdirs(f, os.path.dirname(HOOKSHOT_SAVE + "/" + s + "/" + rel))
+            d = os.path.dirname(HOOKSHOT_SAVE + "/" + s + "/" + rel)
+            mkdirs(f, d)
+            chmod(f, "777", d)
             f.storbinary("STOR " + HOOKSHOT_SAVE + "/" + s + "/" + rel, io.BytesIO(data))
+            chmod(f, "666", HOOKSHOT_SAVE + "/" + s + "/" + rel)
             n += 1
     for name in files:
         f.storbinary("STOR " + HOOKSHOT_SAVE + "/" + name, io.BytesIO(get(f, src + "/" + name)))
+        chmod(f, "666", HOOKSHOT_SAVE + "/" + name)
         n += 1
     f.quit()
     print("Uebernommen: %s (%s%s) -> %s, %d Dateien" % (src, ", ".join(slots), (", " + ", ".join(files)) if files else "",
