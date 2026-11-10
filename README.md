@@ -57,6 +57,19 @@ starten, `ps5/build.py` kompiliert nur, was fehlt.
 Hookshot-Save wird vorher nach `/config/save-backup/<zeit>/` gesichert. `SAVE_FROM` wählt einen anderen Lichii-Ordner.
 Hookshot darf dabei nicht laufen.
 
+## Spieloptionen
+
+Der Reiter „Spieloptionen“ in der Web-UI liest und schreibt per FTP die drei Dateien, die Hookshot im Title-Ordner
+beim Start liest: `language.txt` (Spielsprache), `hookshot_options.ini` (die Zeilen des Insert-Menüs) und
+`hookshot_env.txt` (Schalter). Jede Option hat eine Erklärung und, wo es die PS5 betrifft, einen Hinweis. Quellen sind
+`gpu/vk/vk_menu.h`, `gpu/vk/vk_menu.cpp`, `host/nn_applet.c`, `readme.md`, `docs/development.md` und `docs/PS5.md` von
+PS5_Hookshot. Nur PC-Optionen (Vollbild, GPU-Wahl, DLSS, Reflex, HDR, Maus, Mikrofon, Discord, Bewegungssteuerung) fehlen.
+Die Steuerungszeilen (`pad_`, `key_`) und unbekannte Zeilen der ini bleiben beim Schreiben erhalten. Hookshot vorher
+beenden.
+
+Im Spiel selbst öffnet Touchpad-Klick + Options auf dem DualSense dasselbe Insert-Menü (`host/nn_hid.c`,
+`host/ps5/hos_sdl_ps5.c`: Touchpad ist Back, Options ist Start).
+
 ## Variablen
 
 | Variable | Standard | Bedeutung |

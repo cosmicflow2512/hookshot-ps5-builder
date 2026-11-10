@@ -8,6 +8,10 @@ import subprocess
 import threading
 import time
 import urllib.parse
+import sys
+
+sys.path.insert(0, "/app/scripts")
+import game_options  # noqa: E402
 
 CONFIG = os.environ.get("CONFIG_DIR", "/config")
 LOGS = os.path.join(CONFIG, "logs")
@@ -102,6 +106,11 @@ class H(http.server.BaseHTTPRequestHandler):
         if u.path == "/":
             with open(os.path.join(HERE, "index.html"), "rb") as fh:
                 return self.send(200, fh.read(), "text/html; charset=utf-8")
+        if u.path == "/api/options":
+            try:
+                return self.send(200, json.dumps(dict(game_options.catalog(), **game_options.load())))
+            except Exception as e:   # (PS5 aus, ftpsrv nicht gestartet ...)
+                return self.send(502, json.dumps(dict(game_options.catalog(), error=str(e))))
         if u.path == "/api/status":
             return self.send(200, json.dumps(status()))
         if u.path == "/api/log":
@@ -130,6 +139,13 @@ class H(http.server.BaseHTTPRequestHandler):
                 return self.send(400, json.dumps({"ok": False, "msg": "unbekannte Stufe"}))
             ok, msg = start(stage)
             return self.send(200 if ok else 409, json.dumps({"ok": ok, "msg": msg}))
+        if u.path == "/api/options":
+            n = int(self.headers.get("Content-Length") or 0)
+            try:
+                values = json.loads(self.rfile.read(n) or b"{}")
+                return self.send(200, json.dumps(game_options.save(values)))
+            except Exception as e:
+                return self.send(502, json.dumps({"error": str(e)}))
         if u.path == "/api/stop":
             return self.send(200, json.dumps({"ok": stop()}))
         self.send(404, '{"error":"not found"}')

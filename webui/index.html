@@ -29,6 +29,24 @@
   .ok { color:var(--acc); } .bad { color:var(--err); } .run { color:var(--warn); }
   pre { margin:0; height:calc(100vh - 150px); min-height:300px; overflow:auto; background:#0b0d10; border-radius:6px; padding:10px; font:12px/1.4 ui-monospace, monospace; white-space:pre-wrap; word-break:break-all; }
   .side { display:grid; gap:16px; align-content:start; }
+  .tabs { display:flex; gap:6px; margin-bottom:10px; }
+  .tabs button { width:auto; padding:6px 12px; }
+  .tabs button.on { border-color:var(--acc); }
+  #optview { height:calc(100vh - 150px); min-height:300px; overflow:auto; }
+  fieldset { border:1px solid var(--line); border-radius:6px; margin:0 0 14px; padding:10px 12px; }
+  legend { color:var(--dim); font-size:12px; text-transform:uppercase; letter-spacing:.06em; padding:0 6px; }
+  .opt { display:grid; grid-template-columns: 240px 260px 1fr; gap:4px 14px; padding:8px 0; border-bottom:1px solid #20242c; align-items:start; }
+  .opt:last-child { border-bottom:0; }
+  @media (max-width: 1100px) { .opt { grid-template-columns: 1fr; } }
+  .opt label { font-weight:600; }
+  .opt label code { display:block; font-weight:400; color:var(--dim); font-size:11px; }
+  .opt select { width:100%; background:#232833; color:var(--text); border:1px solid var(--line); border-radius:5px; padding:5px; font:inherit; }
+  .opt select.changed { border-color:var(--warn); }
+  .opt .help { color:var(--text); font-size:13px; }
+  .opt .note { color:var(--dim); font-size:12px; margin-top:3px; }
+  .optbar { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+  .optbar button { width:auto; }
+  #optmsg { color:var(--dim); }
 </style>
 </head>
 <body>
@@ -62,8 +80,17 @@
     </section>
   </div>
   <section>
-    <h2>Log</h2>
+    <div class="tabs"><button id="t-log" class="on">Log</button><button id="t-opt">Spieloptionen</button></div>
     <pre id="log"></pre>
+    <div id="optview" hidden>
+      <div class="optbar">
+        <button id="optload">Von der PS5 laden</button>
+        <button id="optsave" class="primary">Auf die PS5 schreiben</button>
+        <button id="optdefault">Alles auf Standard</button>
+        <span id="optmsg">Hookshot vorher beenden: das Spiel liest die Dateien beim Start und schreibt die ini selbst, wenn man im Menü etwas ändert.</span>
+      </div>
+      <div id="optform"></div>
+    </div>
   </section>
 </main>
 <script>
@@ -109,6 +136,54 @@ document.querySelectorAll('button[data-stage]').forEach(b => b.onclick = async (
 });
 $('#stop').onclick = () => api('/api/stop', { method: 'POST' }).then(refresh);
 refresh(); setInterval(refresh, 2000);
+
+let cat = null, loaded = {};
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function field(key, title, file, choices, value, def, help, note) {
+  const opts = choices.map(([v, t]) => '<option value="' + esc(v) + '"' + (String(v) === String(value) ? ' selected' : '') + '>' +
+    esc(t) + (String(v) === String(def) ? ' (Standard)' : '') + '</option>').join('');
+  return '<div class="opt"><label>' + esc(title) + '<code>' + esc(file) + ': ' + esc(key) + '</code></label>' +
+    '<select data-key="' + esc(key) + '" data-def="' + esc(def) + '">' + opts + '</select>' +
+    '<div><div class="help">' + esc(help) + '</div>' + (note ? '<div class="note">' + esc(note) + '</div>' : '') + '</div></div>';
+}
+function renderOpts(values) {
+  const groups = {};
+  cat.ini.forEach(o => (groups[o.group] = groups[o.group] || []).push(o));
+  let h = '<fieldset><legend>Sprache</legend>' + field('language', 'Spielsprache', 'language.txt', cat.languages,
+    values.language || 'en-US', 'en-US', 'Die Sprache von Texten und Menüs des Spiels (die 16 Sprachen, die das Spiel mitbringt).',
+    'Wirkt nach einem Neustart des Spiels.') + '</fieldset>';
+  for (const g in groups) h += '<fieldset><legend>' + esc(g) + ' (hookshot_options.ini)</legend>' +
+    groups[g].map(o => field(o.key, o.title, 'ini', o.choices, values[o.key] ?? o.default, o.default, o.help, o.note)).join('') + '</fieldset>';
+  h += '<fieldset><legend>Schalter (hookshot_env.txt)</legend>' +
+    cat.env.map(o => field(o.key, o.title, 'env', o.choices, values[o.key] ?? o.default, o.default, o.help, o.note)).join('') + '</fieldset>';
+  $('#optform').innerHTML = h;
+  document.querySelectorAll('#optform select').forEach(s => s.onchange = () =>
+    s.classList.toggle('changed', s.value !== String(loaded[s.dataset.key] ?? s.dataset.def)));
+}
+async function optLoad() {
+  $('#optmsg').textContent = 'Lade von der PS5 ...';
+  const r = await fetch('/api/options'); const d = await r.json();
+  cat = d;
+  if (d.error) { $('#optmsg').textContent = 'PS5 nicht erreichbar (' + d.error + '). Angezeigt: Standardwerte.'; loaded = {}; renderOpts({}); return; }
+  loaded = d.values; renderOpts(d.values);
+  const miss = Object.entries(d.found).filter(([, v]) => !v).map(([k]) => k);
+  $('#optmsg').textContent = 'Geladen.' + (miss.length ? ' Noch nicht auf der PS5: ' + miss.join(', ') + ' (Standardwerte).' : '');
+}
+async function optSave() {
+  const values = {};
+  document.querySelectorAll('#optform select').forEach(s => values[s.dataset.key] = /^-?\d+$/.test(s.value) && s.dataset.key !== 'language' && !/^[A-Z]/.test(s.dataset.key) ? parseInt(s.value) : s.value);
+  $('#optmsg').textContent = 'Schreibe auf die PS5 ...';
+  const r = await fetch('/api/options', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) });
+  const d = await r.json();
+  if (d.error) { $('#optmsg').textContent = 'Fehler: ' + d.error; return; }
+  loaded = d.values; renderOpts(d.values);
+  $('#optmsg').textContent = 'Gespeichert. Hookshot neu starten, damit es die Werte liest.';
+}
+$('#optload').onclick = optLoad;
+$('#optsave').onclick = optSave;
+$('#optdefault').onclick = () => document.querySelectorAll('#optform select').forEach(s => { s.value = s.dataset.def; s.onchange(); });
+$('#t-log').onclick = () => { $('#log').hidden = false; $('#optview').hidden = true; $('#t-log').classList.add('on'); $('#t-opt').classList.remove('on'); };
+$('#t-opt').onclick = () => { $('#log').hidden = true; $('#optview').hidden = false; $('#t-opt').classList.add('on'); $('#t-log').classList.remove('on'); if (!cat) optLoad(); };
 </script>
 </body>
 </html>
