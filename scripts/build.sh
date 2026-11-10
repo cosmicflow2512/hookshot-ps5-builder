@@ -20,7 +20,15 @@ HS="$SRC/PS5_Hookshot"
 VK="$SRC/PS5_Vulkan"
 TPL="$SRC/PS5_VulkanTemplate"
 MESA="$SRC/PS5_Mesa"
-JOBS=${JOBS:-$(( $(nproc) > 2 ? $(nproc) - 2 : 1 ))}
+# ps5/build.py startet seine Compiler ohne Speicherbremse (der PC-Builder nx2/build.py hat eine, MemoryGate, und rechnet
+# ~1,5 GB je Compiler, grosse Chunks mehr). Standard hier: Kerne minus 2, aber hoechstens freier RAM / 2,5 GB.
+default_jobs() {
+    local cpu=$(( $(nproc) > 2 ? $(nproc) - 2 : 1 )) mem
+    mem=$(awk '/^MemAvailable:/ {print int($2 / 1024 / 2560)}' /proc/meminfo 2>/dev/null || echo "$cpu")
+    (( mem < 1 )) && mem=1
+    echo $(( cpu < mem ? cpu : mem ))
+}
+JOBS=${JOBS:-$(default_jobs)}
 GH=https://github.com/mihawk-99
 
 log() { printf '\n==> [%s] %s\n' "$(date '+%H:%M:%S')" "$*"; }

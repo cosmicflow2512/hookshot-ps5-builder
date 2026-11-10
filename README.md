@@ -53,7 +53,7 @@ Danach unter Docker → Add Container das Template `hookshot-ps5-builder` wähle
 | `UPLOAD_NUP` | `false` | `.nup` beim Deploy mitkopieren |
 | `AUTO_DEPLOY` | `false` | nach „Alles bauen“ automatisch deployen |
 | `RUN_ON_START` | `false` | beim Containerstart sofort bauen |
-| `JOBS` | Kerne − 2 | parallele Compiler-Jobs |
+| `JOBS` | Kerne − 2, höchstens freier RAM ÷ 2,5 GB | parallele Compiler-Jobs |
 | `FORCE_DEPLOY` | `false` | alle Dateien neu hochladen |
 
 Kommandozeile ohne Web-UI: `docker exec -it hookshot-ps5-builder /app/scripts/build.sh all` (oder `update`,

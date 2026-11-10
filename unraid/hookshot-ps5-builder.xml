@@ -30,6 +30,6 @@
   <Config Name="UPLOAD_NUP" Target="UPLOAD_NUP" Default="false|true" Mode="" Description="true: die .nup (25,6 GB) beim Deploy mit auf die PS5 kopieren, fortsetzbar, wird uebersprungen wenn sie schon vollstaendig dort liegt" Type="Variable" Display="always" Required="false" Mask="false">false</Config>
   <Config Name="AUTO_DEPLOY" Target="AUTO_DEPLOY" Default="false|true" Mode="" Description="true: nach 'Alles bauen' automatisch deployen" Type="Variable" Display="always" Required="false" Mask="false">false</Config>
   <Config Name="RUN_ON_START" Target="RUN_ON_START" Default="false|true" Mode="" Description="true: beim Containerstart sofort 'Alles bauen'" Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
-  <Config Name="JOBS" Target="JOBS" Default="" Mode="" Description="Parallele Compiler-Jobs. Leer: Kerne minus 2" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="JOBS" Target="JOBS" Default="" Mode="" Description="Parallele Compiler-Jobs. Leer: Kerne minus 2, hoechstens freier RAM / 2,5 GB" Type="Variable" Display="advanced" Required="false" Mask="false"/>
   <Config Name="FORCE_DEPLOY" Target="FORCE_DEPLOY" Default="false|true" Mode="" Description="true: beim Deploy alle Dateien neu hochladen statt nur geaenderte" Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
 </Container>
