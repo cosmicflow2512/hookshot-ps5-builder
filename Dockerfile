@@ -21,6 +21,8 @@ ENV PATH="/opt/venv/bin:${PATH}" \
     WEBUI_PORT=8484 \
     PYTHONUNBUFFERED=1
 
+ARG GIT_SHA=unbekannt
+ENV IMAGE_REV=${GIT_SHA}
 COPY scripts/ /app/scripts/
 COPY webui/ /app/webui/
 RUN chmod +x /app/scripts/*.sh

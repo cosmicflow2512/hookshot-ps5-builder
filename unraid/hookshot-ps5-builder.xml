@@ -14,7 +14,7 @@
   <WebUI>http://[IP]:[PORT:8484]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/cosmicflow2512/hookshot-ps5-builder/main/unraid/hookshot-ps5-builder.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/cosmicflow2512/hookshot-ps5-builder/main/unraid/icon.png</Icon>
-  <ExtraParams>--memory=16g --memory-swap=16g</ExtraParams>
+  <ExtraParams>--memory=8g --memory-swap=8g</ExtraParams>
   <PostArgs/>
   <CPUset/>
   <DonateText/>

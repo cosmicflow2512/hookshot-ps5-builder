@@ -184,6 +184,7 @@ check_space() {
 
 stage=${1:-all}
 mkdir -p "$CONFIG_DIR"
+echo "Image: ${IMAGE_REV:0:7}  Jobs: $JOBS  RAM frei: $(awk '/^MemAvailable:/ {print int($2/1024/1024)}' /proc/meminfo) GB  Container-Limit: $(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo ?)"
 check_space
 case $stage in
     update) stage_update ;;

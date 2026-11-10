@@ -44,7 +44,8 @@ Danach unter Docker → Add Container das Template `hookshot-ps5-builder` wähle
 
 ## Speicher
 
-Das Template begrenzt den Container mit `--memory=16g --memory-swap=16g` (Extra Parameters). Läuft der Build über
+Das Template begrenzt den Container mit `--memory=8g --memory-swap=8g` (Extra Parameters). Das Limit muss unter dem RAM liegen, der auf dem Host
+tatsächlich frei ist (`free -m`, Spalte available), sonst geht dem Host der Speicher vorher aus. Läuft der Build über
 das Limit, beendet der Kernel nur einen Compiler im Container und nicht Prozesse des Hosts. Unraid läuft aus dem RAM
 und hat normalerweise keinen Swap, deshalb ist das Limit wichtig. Ein abgebrochener Build lässt sich einfach neu
 starten, `ps5/build.py` kompiliert nur, was fehlt.
