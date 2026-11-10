@@ -21,10 +21,17 @@ VK="$SRC/PS5_Vulkan"
 TPL="$SRC/PS5_VulkanTemplate"
 MESA="$SRC/PS5_Mesa"
 # ps5/build.py startet seine Compiler ohne Speicherbremse (der PC-Builder nx2/build.py hat eine, MemoryGate, und rechnet
-# ~1,5 GB je Compiler, grosse Chunks mehr). Standard hier: Kerne minus 2, aber hoechstens freier RAM / 2,5 GB.
+# ~1,5 GB je Compiler, die grossen Chunks deutlich mehr). Standard hier: Kerne minus 2, aber hoechstens
+# (freier RAM bzw. Speicherlimit des Containers, das kleinere) / 4 GB.
 default_jobs() {
-    local cpu=$(( $(nproc) > 2 ? $(nproc) - 2 : 1 )) mem
-    mem=$(awk '/^MemAvailable:/ {print int($2 / 1024 / 2560)}' /proc/meminfo 2>/dev/null || echo "$cpu")
+    local cpu=$(( $(nproc) > 2 ? $(nproc) - 2 : 1 )) avail limit mem
+    avail=$(awk '/^MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo 2>/dev/null || echo 0)
+    limit=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo max)
+    if [[ $limit =~ ^[0-9]+$ ]]; then
+        limit=$(( limit / 1024 / 1024 ))
+        (( avail == 0 || limit < avail )) && avail=$limit
+    fi
+    mem=$(( avail / 4096 ))
     (( mem < 1 )) && mem=1
     echo $(( cpu < mem ? cpu : mem ))
 }

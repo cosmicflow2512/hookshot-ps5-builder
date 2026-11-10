@@ -42,6 +42,13 @@ curl -fsSL -o /boot/config/plugins/dockerMan/templates-user/my-hookshot-ps5-buil
 Danach unter Docker → Add Container das Template `hookshot-ps5-builder` wählen, `PS5_HOST` eintragen und die Web-UI
 öffnen (Port 8484).
 
+## Speicher
+
+Das Template begrenzt den Container mit `--memory=16g --memory-swap=16g` (Extra Parameters). Läuft der Build über
+das Limit, beendet der Kernel nur einen Compiler im Container und nicht Prozesse des Hosts. Unraid läuft aus dem RAM
+und hat normalerweise keinen Swap, deshalb ist das Limit wichtig. Ein abgebrochener Build lässt sich einfach neu
+starten, `ps5/build.py` kompiliert nur, was fehlt.
+
 ## Variablen
 
 | Variable | Standard | Bedeutung |
@@ -53,7 +60,7 @@ Danach unter Docker → Add Container das Template `hookshot-ps5-builder` wähle
 | `UPLOAD_NUP` | `false` | `.nup` beim Deploy mitkopieren |
 | `AUTO_DEPLOY` | `false` | nach „Alles bauen“ automatisch deployen |
 | `RUN_ON_START` | `false` | beim Containerstart sofort bauen |
-| `JOBS` | Kerne − 2, höchstens freier RAM ÷ 2,5 GB | parallele Compiler-Jobs |
+| `JOBS` | Kerne − 2, höchstens (freier RAM bzw. Speicherlimit) ÷ 4 GB | parallele Compiler-Jobs |
 | `FORCE_DEPLOY` | `false` | alle Dateien neu hochladen |
 
 Kommandozeile ohne Web-UI: `docker exec -it hookshot-ps5-builder /app/scripts/build.sh all` (oder `update`,
