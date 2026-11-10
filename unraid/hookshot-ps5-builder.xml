@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>hookshot-ps5-builder</Name>
+  <Repository>ghcr.io/cosmicflow2512/hookshot-ps5-builder:latest</Repository>
+  <Registry>https://github.com/cosmicflow2512/hookshot-ps5-builder/pkgs/container/hookshot-ps5-builder</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/cosmicflow2512/hookshot-ps5-builder/issues</Support>
+  <Project>https://github.com/cosmicflow2512/hookshot-ps5-builder</Project>
+  <Overview>Baut mihawk-99/PS5_Hookshot (Ocarina of Time, Switch-2-Recompilation) als natives PS5-Homebrew-Title PPSA99024 aus der eigenen .nup und kopiert es per FTP auf die PS5. Holt bei jedem Lauf den neuesten Stand aller mihawk-99-Repos. Web-UI zum Starten der Stufen und Mitlesen des Logs. Braucht rund 60 GB unter /config.</Overview>
+  <Category>Tools: GameServers:</Category>
+  <WebUI>http://[IP]:[PORT:8484]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/cosmicflow2512/hookshot-ps5-builder/main/unraid/hookshot-ps5-builder.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/cosmicflow2512/hookshot-ps5-builder/main/unraid/icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>PS5 mit etaHEN, ShadowMountPlus und FTP-Server (Port 2121). Eigene .nup von Ocarina of Time, Update v131072.</Requires>
+  <Config Name="Web-UI Port" Target="8484" Default="8484" Mode="tcp" Description="Port der Web-UI" Type="Port" Display="always" Required="true" Mask="false">8484</Config>
+  <Config Name="Appdata" Target="/config" Default="/mnt/user/appdata/hookshot-ps5-builder" Mode="rw" Description="Repos, Toolchain, Lift und Build (ca. 60 GB, am besten auf dem Cache)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/hookshot-ps5-builder</Config>
+  <Config Name="Spiel-Ordner (.nup)" Target="/nup" Default="/mnt/user/PS5/Switch2" Mode="ro" Description="Ordner mit der .nup (wird nur gelesen)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/PS5/Switch2</Config>
+  <Config Name="NUP_FILE" Target="NUP_FILE" Default="" Mode="" Description="Optional: voller Pfad der .nup im Container (z. B. /nup/spiel.nup). Leer: erste .nup mit 0400486024DEC000 im Namen unter /nup" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="PS5_HOST" Target="PS5_HOST" Default="" Mode="" Description="IP-Adresse der PS5 (fuer das Deploy)" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="PS5_FTP_PORT" Target="PS5_FTP_PORT" Default="2121" Mode="" Description="FTP-Port der PS5" Type="Variable" Display="always" Required="false" Mask="false">2121</Config>
+  <Config Name="PS5_NUP_PATH" Target="PS5_NUP_PATH" Default="/data/prosperoeden/roms/oot/oot.nup" Mode="" Description="Wo die .nup auf der PS5 liegt bzw. hin soll. Weicht der Pfad vom Standard ab, wird HOS_PS5_NUP in hookshot_env.txt gesetzt" Type="Variable" Display="always" Required="false" Mask="false">/data/prosperoeden/roms/oot/oot.nup</Config>
+  <Config Name="UPLOAD_NUP" Target="UPLOAD_NUP" Default="false|true" Mode="" Description="true: die .nup (25,6 GB) beim Deploy mit auf die PS5 kopieren, fortsetzbar, wird uebersprungen wenn sie schon vollstaendig dort liegt" Type="Variable" Display="always" Required="false" Mask="false">false</Config>
+  <Config Name="AUTO_DEPLOY" Target="AUTO_DEPLOY" Default="false|true" Mode="" Description="true: nach 'Alles bauen' automatisch deployen" Type="Variable" Display="always" Required="false" Mask="false">false</Config>
+  <Config Name="RUN_ON_START" Target="RUN_ON_START" Default="false|true" Mode="" Description="true: beim Containerstart sofort 'Alles bauen'" Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+  <Config Name="JOBS" Target="JOBS" Default="" Mode="" Description="Parallele Compiler-Jobs. Leer: Kerne minus 2" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="FORCE_DEPLOY" Target="FORCE_DEPLOY" Default="false|true" Mode="" Description="true: beim Deploy alle Dateien neu hochladen statt nur geaenderte" Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+</Container>
