@@ -48,6 +48,15 @@ das Limit, beendet der Kernel nur einen Compiler im Container und nicht Prozesse
 und hat normalerweise keinen Swap, deshalb ist das Limit wichtig. Ein abgebrochener Build lässt sich einfach neu
 starten, `ps5/build.py` kompiliert nur, was fehlt.
 
+## Spielstände von PS5_Lichii
+
+„Spielstände anzeigen“ listet per FTP die OoT-Saves von PS5_Lichii (`/data/lichii/user`, ältere Stände
+`/data/prosperoeden/user`, Edens Pfad `nand/user/save/…/0400486024DEC000/`) und den von Hookshot
+(`/data/homebrew/PPSA99024/user/save/<uid>/`). „Lichii-Saves übernehmen“ kopiert die slot_*-Ordner, `account.sav` und
+`option.sav` des zuletzt gespeicherten Lichii-Saves zu Hookshot, wie `scripts/oot_saves.py` von PS5_Hookshot. Das
+Hookshot-Save wird vorher nach `/config/save-backup/<zeit>/` gesichert. `SAVE_FROM` wählt einen anderen Lichii-Ordner.
+Hookshot darf dabei nicht laufen.
+
 ## Variablen
 
 | Variable | Standard | Bedeutung |

@@ -13,7 +13,7 @@ CONFIG = os.environ.get("CONFIG_DIR", "/config")
 LOGS = os.path.join(CONFIG, "logs")
 HS = os.path.join(CONFIG, "src", "PS5_Hookshot")
 PORT = int(os.environ.get("WEBUI_PORT", "8484"))
-STAGES = ("all", "update", "build", "deploy")
+STAGES = ("all", "update", "build", "deploy", "saves-list", "saves")
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 state = {"proc": None, "stage": None, "started": None, "ended": None, "code": None, "log": None}

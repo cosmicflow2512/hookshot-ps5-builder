@@ -5,6 +5,7 @@
 #                     Revisionen, die build-title.sh dieses Stands pinnt ("played with on a console")
 #   build.sh build    ps5/build-title.sh <nup> --jobs N: Toolchain, RADV, Lift, Kompilieren, Linken -> dist/PPSA99024
 #   build.sh deploy   dist/PPSA99024 per FTP auf die PS5 (scripts/deploy.py)
+#   build.sh saves    OoT-Spielstaende von PS5_Lichii auf der PS5 nach Hookshot uebernehmen (scripts/import_saves.py)
 #   build.sh all      update + build (+ deploy bei AUTO_DEPLOY=true)
 #
 # Alles liegt unter $CONFIG_DIR/src (die Repos nebeneinander, wie build-title.sh es erwartet).
@@ -129,10 +130,12 @@ case $stage in
     update) stage_update ;;
     build|toolchain|lift) stage_build ;;
     deploy) stage_deploy ;;
+    saves) log "Spielstaende von Lichii nach Hookshot (auf der PS5)"; python3 -I /app/scripts/import_saves.py ;;
+    saves-list) python3 -I /app/scripts/import_saves.py --list ;;
     all)
         stage_update
         stage_build
         if [[ ${AUTO_DEPLOY:-false} == true ]]; then stage_deploy; fi
         ;;
-    *) die "unbekannte Stufe: $stage (update|build|deploy|all)" ;;
+    *) die "unbekannte Stufe: $stage (update|build|deploy|saves|saves-list|all)" ;;
 esac
