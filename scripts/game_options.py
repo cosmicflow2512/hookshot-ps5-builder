@@ -1,7 +1,11 @@
 """Spieloptionen von Hookshot auf der PS5 lesen und schreiben, per FTP: hookshot_options.ini (das Insert-Menue),
 hookshot_env.txt (Schalter) und language.txt (Sprache), alle im Title-Ordner /data/homebrew/PPSA99024.
 
-Quellen (PS5_Hookshot, Stand ps5-v0.1.0-beta.1):
+Quellen (PS5_Hookshot, Stand ps5-v0.1.0-beta.2):
+  host/hos_main.c       Vorgaben der Konsole (setenv ohne Ueberschreiben, nach hookshot_env.txt): HOS_HANDHELD=1,
+                        RX_VK_TEX_MAX_DIM=512, RX_VK_FRAMEGEN_MULT=2, RX_VK_PACE=1, RX_VK_FSR_FG=0 u. a. Diese gehen
+                        ueber die ini (menu_init): Zwischenbilder, Bildtaktung und Handheld-Profil stellt man auf der PS5
+                        deshalb per Schalter, nicht in der ini.
   gpu/vk/vk_menu.h      struct Options: Werte und Standards
   gpu/vk/vk_menu.cpp    rows[]: Zeilen, Grenzen, Texte; ini_key(): Schluessel (Zeilenname klein, Leerzeichen -> _, mit
                         den Ausnahmen output_res, resolution, upscaling, dlss); menu_init(): fehlende Schluessel behalten
@@ -38,20 +42,11 @@ INI = [
      "Ändert man danach selbst eine dieser Zeilen, springt sie auf Eigene. Hier gesetzt wirken nur die Speichergrenzen der "
      "Voreinstellung: die einzelnen Zeilen setzt das Spiel erst, wenn sie im Insert-Menü gewählt wird.",
      "Auf der PS5 knapp: laut docs/PS5.md geht der Speicher unter Last nach einer Weile aus. Eigene ist der sichere Wert."),
-    ("Grafik", "frame_generation", "Zwischenbilder (Frame Generation)", 0,
-     [(0, "Aus"), (1, "Auto (bis zur Bildwiederholrate)"), (2, "2x"), (3, "3x"), (4, "4x"), (5, "5x"), (6, "6x"),
-      (7, "7x"), (8, "8x")],
-     "Berechnet Bilder zwischen den echten Spielbildern: flüssiger, aber etwas mehr Eingabeverzögerung und Artefakte bei "
-     "schnellen Bewegungen oder Schnitten.",
-     "PS5: 2x und 3x macht PS5_MihawkGen (im Build enthalten), darüber die eigene Interpolation des Renderers. Getestet: "
-     "33-40 fps nativ im Kokiri-Wald, mit 2x doppelt so viele angezeigt."),
-    ("Grafik", "frame_pacing", "Bildtaktung (Frame Pacing)", 0, ONOFF,
-     "Aus: jedes Bild sofort zeigen. An: in gleichmäßigem Abstand, weniger Ruckeln, bis zu ein Bild mehr Verzögerung.", ""),
     ("Grafik", "output_res", "Ausgabeauflösung", 0,
      [(0, "2048x1152 (Spielstandard)"), (3, "1920x1080"), (1, "2560x1440"), (2, "3840x2160")],
      "Die Größe des ganzen Spielbilds samt HUD, bevor es auf den Bildschirm skaliert wird. Nur im Docked-Profil.",
-     "Wirkt nach einem Neustart des Spiels. 3840x2160 bekommt einen größeren GPU-Speicherpool, kostet also Speicher, der "
-     "auf der PS5 schon knapp ist."),
+     "Auf der PS5 ohne Wirkung, solange das Handheld-Profil an ist (Konsolenvorgabe, Schalter HOS_HANDHELD unten). Wirkt "
+     "nach einem Neustart. 3840x2160 bekommt einen größeren GPU-Speicherpool."),
     ("Grafik", "dlss", "Upscaler", 0, [(0, "Spieleigener"), (3, "AMD FSR 3.1")],
      "Was das 3D-Bild auf die Ausgabeauflösung hochrechnet. FSR 3.1 ist in jedem Build enthalten und läuft auf GPUs mit "
      "Vulkan 1.3, Push-Deskriptoren und bestimmten Speicherformaten. DLSS/DLAA gibt es nur mit NVIDIA-Karten.",
@@ -72,23 +67,16 @@ INI = [
      [(0, "60 (wie die Konsole)"), (1, "90"), (2, "120"), (3, "144"), (4, "165"), (5, "240")],
      "Höchstens so viele Bilder pro Sekunde. Über 60 hält das Spiel die Echtzeit.",
      "Wirkt nach einem Neustart. Auf der PS5 kaum sinnvoll: laut docs/PS5.md 33-40 fps im Kokiri-Wald."),
-    ("Grafik", "handheld_profile", "Handheld-Profil", 0, ONOFF,
-     "Lässt das Spiel laufen, als wäre die Switch 2 nicht im Dock: niedrigere Auflösungen, weniger GPU-Last.",
-     "Wirkt nach einem Neustart. Kann auf der PS5 bei Ruckeln oder Speichermangel helfen."),
     ("Grafik", "ultrawide", "Ultrawide", 0, [(0, "16:9"), (1, "Bildschirmform")],
      "Die Kamera nimmt die Form des Bildschirms an (breiter oder schmaler als 16:9). Das HUD bleibt gestreckt.",
      "Wirkt nach einem Neustart. Am 16:9-Fernseher ohne Wirkung."),
     ("Grafik", "robust_buffers", "Robuste Puffer", 0, [(0, "Auto (an)"), (1, "Aus"), (2, "An")],
      "Puffer-Lesezugriffe mit Grenzprüfung: ein Lesen über das Ende wird verworfen, statt die GPU anzuhalten.",
      "Wirkt nach einem Neustart. Aus kann schneller sein, riskiert aber GPU-Hänger."),
-    ("Grafik", "descriptor_reuse", "Deskriptor-Wiederverwendung", 0, ONOFF,
-     "Ein Draw behält seine Deskriptoren, solange sich seine Textur-Slots nicht ändern; Texture-Streaming baut dann nicht "
-     "jedes Bild alle Sets neu.", "Wirkt nach einem Neustart. Experimentell."),
-    ("Grafik", "sampler_cache", "Sampler-Cache", 0, ONOFF,
-     "Sampler-Daten liegen beim Replay-Thread, ein Sampler braucht dann keine Sperre. Hilft beim Texture-Streaming.",
-     "Wirkt nach einem Neustart. Experimentell."),
     ("Spiel", "fps_counter", "FPS-Anzeige", 0, ONOFF,
      "Bilder pro Sekunde oben rechts. Mit Zwischenbildern auch die echte Bildrate des Spiels.", ""),
+    ("Spiel", "menu_size", "Menügröße", 0, [(0, "Auto"), (1, "Klein"), (2, "Mittel"), (3, "Groß")],
+     "Wie groß das Insert-Menü, die FPS-Anzeige und der Startbildschirm gezeichnet werden. Auto: nach der Bildhöhe.", ""),
     ("Spiel", "game_speed", "Spielgeschwindigkeit", 1, [(1, "Echtzeit"), (0, "Pro Bild")],
      "Wie das Spiel unter 60 fps die Zeit hält. Echtzeit: normale Geschwindigkeit bis 15 fps durch längere Schritte. Pro "
      "Bild: ein Schritt je Bild, das Spiel wird langsamer, wenn es unter 60 fps fällt.",
@@ -123,21 +111,35 @@ INI = [
 
 # Schalter in hookshot_env.txt: Name, Titel, Standard (""=nicht gesetzt), Auswahl, Erklaerung, Hinweis
 ENV = [
+    ("HOS_HANDHELD", "Handheld-Profil", "", [("", "An (Konsolenvorgabe)"), ("0", "Aus (Docked)")],
+     "Lässt das Spiel laufen, als wäre die Switch 2 nicht im Dock: niedrigere Auflösungen, weniger GPU-Last und Speicher. "
+     "Aus: Docked mit der Ausgabeauflösung aus dem Grafikteil.",
+     "Die PS5 startet mit Handheld (host/hos_main.c), weil Spiel, Renderer und Programm sich 13,2 GB teilen. Docked "
+     "braucht mehr Speicher: ungetestet, Abstürze durch Speichermangel möglich."),
+    ("RX_VK_FRAMEGEN", "Zwischenbilder", "", [("", "An (Konsolenvorgabe)"), ("0", "Aus")],
+     "Berechnet Bilder zwischen den echten Spielbildern: flüssiger, aber etwas mehr Eingabeverzögerung und Artefakte bei "
+     "schnellen Bewegungen oder Schnitten. Aus: nur die echten Bilder (26-40 fps im Kokiri-Wald).", "docs/PS5.md"),
+    ("RX_VK_FRAMEGEN_MULT", "Zwischenbilder-Faktor", "", [("", "2x (Konsolenvorgabe)"), ("3", "3x"), ("4", "4x"),
+                                                         ("5", "5x"), ("6", "6x"), ("7", "7x"), ("8", "8x")],
+     "Wie viele Bilder je echtem Bild gezeigt werden. 2x: ein berechnetes zwischen zwei echten (65 fps aus 33).",
+     "Auf der PS5 ist 2x die Vorgabe. 2x und 3x rechnet PS5_MihawkGen, darüber die eigene Interpolation des Renderers (docs/PS5.md)."),
+    ("RX_VK_MIHAWKGEN", "PS5_MihawkGen", "", [("", "An (Standard)"), ("0", "Aus")],
+     "Bei 2x und 3x rechnet das neuronale Netz von PS5_MihawkGen die Zwischenbilder. Aus: die eigene Interpolation des "
+     "Renderers, oder FSR 3.1 mit dem Schalter darunter.", "docs/PS5.md"),
+    ("RX_VK_FSR_FG", "FSR 3.1 Frame Interpolation", "", [("", "Aus (Konsolenvorgabe)"), ("1", "An")],
+     "AMDs Frame Interpolation statt der eigenen, wenn PS5_MihawkGen aus ist.", "Auf der Konsole bewusst aus; ungetestet."),
+    ("RX_VK_PACE", "Bildtaktung (Frame Pacing)", "", [("", "An (Konsolenvorgabe)"), ("0", "Aus")],
+     "An: Bilder in gleichmäßigem Abstand, weniger Ruckeln, bis zu ein Bild mehr Verzögerung. Aus: jedes Bild sofort.", ""),
+    ("RX_VK_TEX_MAX_DIM", "Maximale Texturgröße", "", [("", "512 (Konsolenvorgabe)"), ("256", "256"), ("1024", "1024")],
+     "Größere Texturen lässt das Spiel ohne ihre obersten Stufen: schärfer mit höherem Wert, aber mehr Speicher.",
+     "Mit 1024 lief Hyrule-Stadt in zwei von drei Läufen beim Betreten in Speichermangel (docs/PS5.md); 512 ist deshalb "
+     "seit beta.2 Vorgabe."),
     ("HOS_OOT_CHEATS", "Debug-Menü (Cheats)", "", [("", "Aus"), ("1", "An")],
      "Schaltet das Debug-Menü frei: im Insert-Menü unter Gameplay → Cheats (Flug, freie Kamera, Teleport, Inventar ...).",
      "readme.md"),
-    ("RX_VK_MIHAWKGEN", "PS5_MihawkGen für Zwischenbilder", "", [("", "An (Standard)"), ("0", "Aus")],
-     "Bei 2x und 3x rechnet auf der PS5 das neuronale Netz von PS5_MihawkGen die Zwischenbilder. Aus: die eigene "
-     "Interpolation des Renderers.", "docs/PS5.md"),
-    ("RX_VK_FRAMEGEN", "Zwischenbilder erzwingen aus", "", [("", "wie im Menü"), ("0", "immer aus")],
-     "0: keine Zwischenbilder, egal was im Menü steht.", "docs/development.md"),
     ("RX_VK_MOVIE_UPSCALE", "Upscaling der Videos", "", [("", "auto (Standard)"), ("linear", "linear")],
-     "auto: neuronales Upscaling der Zwischensequenz-Videos, Rückfall auf linear, wenn ein Videobild die GPU über 40 ms "
-     "kostet (nur NVIDIA nutzt die Netze, sonst immer linear). linear: immer das einfache, weicher.", "readme.md"),
-    ("RX_VK_ASTC_RGBA8", "AMD-Texturfehler-Workaround", "", [("", "Aus"), ("1", "An")],
-     "Behält ASTC-Texturen als RGBA8 statt sie neu nach BC3 zu kodieren. Gegen blockige oder dunkle Texturen auf "
-     "AMD-GPUs (Upstream-Issues #57, #1006).",
-     "Braucht deutlich mehr Grafikspeicher: auf der PS5 nur bei Texturfehlern, sonst droht Speichermangel."),
+     "auto: neuronales Upscaling der Zwischensequenz-Videos, nur auf NVIDIA-Karten; sonst immer linear. linear: immer "
+     "das einfache, weicher.", "Auf der PS5 (AMD) ohne Unterschied."),
     ("HOOKSHOT_OCCLUSION_OFF", "Occlusion Queries aus", "", [("", "Aus"), ("1", "An")],
      "Keine Occlusion Queries (Fritchiis 'Occlusion Off', laut Quellkommentar in nx2/lift.py).",
      "Wirkung auf der PS5 ungeprüft."),

@@ -64,6 +64,8 @@ beim Start liest: `language.txt` (Spielsprache), `hookshot_options.ini` (die Zei
 `hookshot_env.txt` (Schalter). Jede Option hat eine Erklärung und, wo es die PS5 betrifft, einen Hinweis. Quellen sind
 `gpu/vk/vk_menu.h`, `gpu/vk/vk_menu.cpp`, `host/nn_applet.c`, `readme.md`, `docs/development.md` und `docs/PS5.md` von
 PS5_Hookshot. Nur PC-Optionen (Vollbild, GPU-Wahl, DLSS, Reflex, HDR, Maus, Mikrofon, Discord, Bewegungssteuerung) fehlen.
+Zwischenbilder, Bildtaktung und das Handheld-Profil stehen bei den Schaltern: die Konsole gibt sie in `host/hos_main.c`
+per Umgebung vor, und die geht über die ini.
 Die Steuerungszeilen (`pad_`, `key_`) und unbekannte Zeilen der ini bleiben beim Schreiben erhalten. Hookshot vorher
 beenden.
 
