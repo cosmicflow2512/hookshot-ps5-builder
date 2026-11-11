@@ -44,7 +44,15 @@ default_jobs() {
     (( mem < 1 )) && mem=1
     echo $(( cpu < mem ? cpu : mem ))
 }
+# Lift (nx2/lift.py): forkt Emit-Worker, je einen pro 2 GB *freiem Host-RAM* (nx2/chunks.py emit_jobs); das
+# Container-Limit sieht es nicht, und der Hauptprozess haelt selbst mehrere GB. Ein Lauf mit 3 Workern unter 6 GB wurde
+# beendet (Killed). Hier: 1 (ohne Fork) unter 10 GB Budget, darueber je 2 GB nach 4 GB fuer den Hauptprozess.
+default_lift_jobs() {
+    local b; b=$(budget_mb)
+    if (( b < 10240 )); then echo 1; else echo $(( (b - 4096) / 2048 )); fi
+}
 JOBS=${JOBS:-$(default_jobs)}
+HOOKSHOT_LIFT_JOBS=${HOOKSHOT_LIFT_JOBS:-$(default_lift_jobs)}
 BUILD_PAR=${BUILD_PAR:-$(default_par)}
 
 log() { printf '\n==> [%s] %s\n' "$(date '+%H:%M:%S')" "$*"; }
@@ -119,7 +127,7 @@ stage_build() {
     nup=$(find_nup)
     log "ps5/build-title.sh $(basename "$nup") --jobs $JOBS  (PS5_Hookshot $(git -C "$HS" describe --tags --always))"
     echo "  Teilschritte loggen nach $HS/work/build-title/*.log, bei Fehlern stehen die letzten 30 Zeilen hier."
-    (cd "$HS" && export BUILD_PAR NINJA=/app/scripts/bin/ninja-limited PATH="/app/scripts/bin:$PATH" &&
+    (cd "$HS" && export BUILD_PAR HOOKSHOT_LIFT_JOBS NINJA=/app/scripts/bin/ninja-limited PATH="/app/scripts/bin:$PATH" &&
         bash ps5/build-title.sh "$nup" --jobs "$JOBS")
     [[ -f $HS/dist/PPSA99024/eboot.bin ]] || die "dist/PPSA99024/eboot.bin fehlt nach dem Build"
     log "Fertig: $HS/dist/PPSA99024 ($(du -sh "$HS/dist/PPSA99024" | cut -f1))"
@@ -136,7 +144,7 @@ stage_deploy() {
 stage=${1:-all}
 mkdir -p "$CONFIG_DIR"
 IMAGE_REV=${IMAGE_REV:-unbekannt}
-echo "Image: ${IMAGE_REV:0:7}  Ref: $REF  Jobs: $JOBS  Parallel: $BUILD_PAR  RAM frei: $(awk '/^MemAvailable:/ {print int($2/1024/1024)}' /proc/meminfo) GB  Container-Limit: $(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo ?)"
+echo "Image: ${IMAGE_REV:0:7}  Ref: $REF  Jobs: $JOBS  Parallel: $BUILD_PAR  Lift: $HOOKSHOT_LIFT_JOBS  RAM frei: $(awk '/^MemAvailable:/ {print int($2/1024/1024)}' /proc/meminfo) GB  Container-Limit: $(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo ?)"
 free=$(df -Pk "$CONFIG_DIR" | awk 'NR==2 {print int($4/1024/1024)}')
 (( free >= 60 )) || echo "WARNUNG: nur ${free} GB frei unter $CONFIG_DIR, Upstream nennt ~60 GB fuer den Build"
 case $stage in

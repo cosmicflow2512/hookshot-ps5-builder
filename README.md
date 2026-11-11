@@ -86,6 +86,7 @@ Im Spiel selbst öffnet Touchpad-Klick + Options auf dem DualSense dasselbe Inse
 | `RUN_ON_START` | `false` | beim Containerstart sofort bauen |
 | `JOBS` | Kerne − 2, höchstens (freier RAM bzw. Speicherlimit) ÷ 3 GB | Spiel-Dateien gleichzeitig |
 | `BUILD_PAR` | Kerne − 2, höchstens (freier RAM bzw. Speicherlimit) ÷ 1 GB | ninja/make beim RADV-, FFmpeg- und zstd-Build |
+| `HOOKSHOT_LIFT_JOBS` | 1 unter 10 GB Budget, sonst (Budget − 4 GB) ÷ 2 GB | Emit-Prozesse des Lifts (`nx2/chunks.py`) |
 | `FORCE_DEPLOY` | `false` | alle Dateien neu hochladen |
 
 Kommandozeile ohne Web-UI: `docker exec -it hookshot-ps5-builder /app/scripts/build.sh all` (oder `update`,
