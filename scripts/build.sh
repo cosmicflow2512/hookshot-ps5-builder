@@ -130,6 +130,7 @@ stage_build() {
     (cd "$HS" && export BUILD_PAR HOOKSHOT_LIFT_JOBS NINJA=/app/scripts/bin/ninja-limited PATH="/app/scripts/bin:$PATH" &&
         bash ps5/build-title.sh "$nup" --jobs "$JOBS")
     [[ -f $HS/dist/PPSA99024/eboot.bin ]] || die "dist/PPSA99024/eboot.bin fehlt nach dem Build"
+    python3 -I /app/scripts/write_build_info.py "$HS" "$CONFIG_DIR/build-info.json"
     log "Fertig: $HS/dist/PPSA99024 ($(du -sh "$HS/dist/PPSA99024" | cut -f1))"
 }
 
@@ -152,11 +153,12 @@ case $stage in
     build|toolchain|lift) stage_build ;;
     deploy) stage_deploy ;;
     saves) log "Spielstaende von Lichii nach Hookshot (auf der PS5)"; python3 -I /app/scripts/import_saves.py ;;
+    check) log "Auf Updates pruefen"; python3 -I /app/scripts/check_updates.py ;;
     saves-list) python3 -I /app/scripts/import_saves.py --list ;;
     all)
         stage_update
         stage_build
         if [[ ${AUTO_DEPLOY:-false} == true ]]; then stage_deploy; fi
         ;;
-    *) die "unbekannte Stufe: $stage (update|build|deploy|saves|saves-list|all)" ;;
+    *) die "unbekannte Stufe: $stage (check|update|build|deploy|saves|saves-list|all)" ;;
 esac

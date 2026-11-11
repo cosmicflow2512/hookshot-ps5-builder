@@ -57,6 +57,17 @@ starten, `ps5/build.py` kompiliert nur, was fehlt.
 Hookshot-Save wird vorher nach `/config/save-backup/<zeit>/` gesichert. `SAVE_FROM` wählt einen anderen Lichii-Ordner.
 Hookshot darf dabei nicht laufen.
 
+## Auf Updates prüfen
+
+Der Button „Auf Updates prüfen“ vergleicht per `git ls-remote` mit GitHub:
+
+- **PS5_Hookshot:** neuestes `ps5-v*`-Release und `main` gegen den gebauten Stand (`/config/build-info.json`, schreibt
+  jeder Build). Bei einem neuen Release auch, welche Pins sich ändern (z. B. PS5_Mesa, dann wird RADV neu gebaut).
+- **Container:** `cosmicflow2512/hookshot-ps5-builder` `main` gegen das laufende Image.
+- **PS5:** ob der zuletzt kopierte Build (`/config/deploy-manifest.json`) der aktuelle aus `dist/PPSA99024` ist.
+
+Das Ergebnis steht im Log und unter „Stand → Updates“.
+
 ## Spieloptionen
 
 Der Reiter „Spieloptionen“ in der Web-UI liest und schreibt per FTP die drei Dateien, die Hookshot im Title-Ordner

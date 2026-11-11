@@ -56,6 +56,7 @@
     <section>
       <h2>Aktionen</h2>
       <div class="btns">
+        <button data-stage="check">Auf Updates prüfen<small>gebauter Stand, PS5 und Container gegen GitHub</small></button>
         <button class="primary" data-stage="all">Alles bauen<small>Aktualisieren und Build</small></button>
         <button data-stage="update">Aktualisieren<small>neuestes PS5_Hookshot-Release und seine Pins</small></button>
         <button data-stage="build">Build<small>ps5/build-title.sh: Toolchain, Lift, Kompilieren, Linken</small></button>
@@ -71,6 +72,7 @@
         <dt>Spiel</dt><dd id="nup">&ndash;</dd>
         <dt>PS5</dt><dd id="host">&ndash;</dd>
         <dt>Letzter Build</dt><dd id="build">&ndash;</dd>
+        <dt>Updates</dt><dd id="upd">noch nicht geprüft</dd>
         <dt>Frei</dt><dd id="free">&ndash;</dd>
       </dl>
     </section>
@@ -112,6 +114,9 @@ async function refresh() {
     $('#host').textContent = s.ps5_host || 'PS5_HOST nicht gesetzt';
     $('#build').textContent = s.build || 'noch keiner';
     $('#free').textContent = s.free_gb + ' GB';
+    const u = s.updates, ud = $('#upd');
+    if (u) { ud.textContent = (u.update ? 'es gibt etwas zu tun' : 'alles aktuell') + ' (gebaut: ' + (u.built || '?') +
+      ', neuestes: ' + (u.latest || '?') + ', geprüft ' + u.time + ')'; ud.className = u.update ? 'run' : 'ok'; }
     $('#repos').innerHTML = Object.entries(s.repos).map(([k, v]) =>
       '<dt>' + k.replace('PS5_', '') + '</dt><dd>' + (v ? v.replace(/</g, '&lt;') : '&ndash;') + '</dd>').join('');
     if (s.log !== lastLog) { lastLog = s.log; next = 0; $('#log').textContent = ''; }

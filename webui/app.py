@@ -17,7 +17,7 @@ CONFIG = os.environ.get("CONFIG_DIR", "/config")
 LOGS = os.path.join(CONFIG, "logs")
 HS = os.path.join(CONFIG, "src", "PS5_Hookshot")
 PORT = int(os.environ.get("WEBUI_PORT", "8484"))
-STAGES = ("all", "update", "build", "deploy", "saves-list", "saves")
+STAGES = ("check", "all", "update", "build", "deploy", "saves-list", "saves")
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 state = {"proc": None, "stage": None, "started": None, "ended": None, "code": None, "log": None}
@@ -83,6 +83,12 @@ def status():
     eboot = os.path.join(HS, "dist", "PPSA99024", "eboot.bin")
     s["build"] = time.strftime("%d.%m.%Y %H:%M", time.localtime(os.path.getmtime(eboot))) if os.path.exists(eboot) else None
     s["repos"] = {n: git_rev(n) for n in ("PS5_Hookshot", "PS5_Vulkan", "PS5_PayloadSDK", "PS5_MihawkGen", "PS5_Mesa")}
+    try:
+        with open(os.path.join(CONFIG, "update-check.json")) as fh:
+            u = json.load(fh)
+        s["updates"] = {"time": u.get("time"), "update": u.get("update"), "latest": u.get("latest"), "built": u.get("built")}
+    except (OSError, ValueError):
+        s["updates"] = None
     st = os.statvfs(CONFIG)
     s["free_gb"] = round(st.f_bavail * st.f_frsize / (1 << 30), 1)
     return s
