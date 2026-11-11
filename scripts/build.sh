@@ -18,22 +18,34 @@ HS="$SRC/PS5_Hookshot"
 GH=https://github.com/mihawk-99
 REF=${HOOKSHOT_REF:-latest}
 
-# ps5/build.py startet seine Compiler ohne Speicherbremse; build-title.sh rechnet 2 GB je Compiler ("ten at once took
-# 14 GB at their peak"), nimmt dafuer aber den gesamten RAM des Hosts. Hier: Kerne minus 2, hoechstens
-# (freier RAM bzw. Speicherlimit des Containers, das kleinere) / 4 GB.
-default_jobs() {
-    local cpu=$(( $(nproc) > 2 ? $(nproc) - 2 : 1 )) avail limit mem
+# Speicherbudget: das kleinere von freiem RAM und Speicherlimit des Containers (Template: 6 GB).
+#  JOBS       Spiel-Dateien gleichzeitig (ps5/build.py): je 3 GB. build-title.sh rechnet 2 GB je Compiler ("ten at once
+#             took 14 GB at their peak"), nimmt dafuer aber den RAM des ganzen Hosts.
+#  BUILD_PAR  alles andere (RADV per ninja, FFmpeg/zstd per make -j$(nproc)): je 1 GB. Ohne Grenze startet ninja Kerne+2
+#             und make so viele wie Kerne.
+budget_mb() {
+    local avail limit
     avail=$(awk '/^MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo 2>/dev/null || echo 0)
     limit=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo max)
     if [[ $limit =~ ^[0-9]+$ ]]; then
         limit=$(( limit / 1024 / 1024 ))
         (( avail == 0 || limit < avail )) && avail=$limit
     fi
-    mem=$(( avail / 4096 ))
+    echo "$avail"
+}
+CORES=$(/usr/bin/nproc)
+default_par() {
+    local cpu=$(( CORES > 2 ? CORES - 2 : 1 )) mem=$(( $(budget_mb) / 1024 ))
+    (( mem < 1 )) && mem=1
+    echo $(( cpu < mem ? cpu : mem ))
+}
+default_jobs() {
+    local cpu=$(( CORES > 2 ? CORES - 2 : 1 )) mem=$(( $(budget_mb) / 3072 ))
     (( mem < 1 )) && mem=1
     echo $(( cpu < mem ? cpu : mem ))
 }
 JOBS=${JOBS:-$(default_jobs)}
+BUILD_PAR=${BUILD_PAR:-$(default_par)}
 
 log() { printf '\n==> [%s] %s\n' "$(date '+%H:%M:%S')" "$*"; }
 die() { printf '\nFEHLER: %s\n' "$*" >&2; exit 1; }
@@ -107,7 +119,8 @@ stage_build() {
     nup=$(find_nup)
     log "ps5/build-title.sh $(basename "$nup") --jobs $JOBS  (PS5_Hookshot $(git -C "$HS" describe --tags --always))"
     echo "  Teilschritte loggen nach $HS/work/build-title/*.log, bei Fehlern stehen die letzten 30 Zeilen hier."
-    (cd "$HS" && bash ps5/build-title.sh "$nup" --jobs "$JOBS")
+    (cd "$HS" && export BUILD_PAR NINJA=/app/scripts/bin/ninja-limited PATH="/app/scripts/bin:$PATH" &&
+        bash ps5/build-title.sh "$nup" --jobs "$JOBS")
     [[ -f $HS/dist/PPSA99024/eboot.bin ]] || die "dist/PPSA99024/eboot.bin fehlt nach dem Build"
     log "Fertig: $HS/dist/PPSA99024 ($(du -sh "$HS/dist/PPSA99024" | cut -f1))"
 }
@@ -123,7 +136,7 @@ stage_deploy() {
 stage=${1:-all}
 mkdir -p "$CONFIG_DIR"
 IMAGE_REV=${IMAGE_REV:-unbekannt}
-echo "Image: ${IMAGE_REV:0:7}  Ref: $REF  Jobs: $JOBS  RAM frei: $(awk '/^MemAvailable:/ {print int($2/1024/1024)}' /proc/meminfo) GB  Container-Limit: $(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo ?)"
+echo "Image: ${IMAGE_REV:0:7}  Ref: $REF  Jobs: $JOBS  Parallel: $BUILD_PAR  RAM frei: $(awk '/^MemAvailable:/ {print int($2/1024/1024)}' /proc/meminfo) GB  Container-Limit: $(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo ?)"
 free=$(df -Pk "$CONFIG_DIR" | awk 'NR==2 {print int($4/1024/1024)}')
 (( free >= 60 )) || echo "WARNUNG: nur ${free} GB frei unter $CONFIG_DIR, Upstream nennt ~60 GB fuer den Build"
 case $stage in

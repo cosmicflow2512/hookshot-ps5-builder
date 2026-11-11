@@ -42,7 +42,7 @@ Danach unter Docker → Add Container das Template `hookshot-ps5-builder` wähle
 
 ## Speicher
 
-Das Template begrenzt den Container mit `--memory=8g --memory-swap=8g` (Extra Parameters). Das Limit muss unter dem RAM liegen, der auf dem Host
+Das Template begrenzt den Container mit `--memory=6g --memory-swap=6g` (Extra Parameters). Das Limit muss unter dem RAM liegen, der auf dem Host
 tatsächlich frei ist (`free -m`, Spalte available), sonst geht dem Host der Speicher vorher aus. Läuft der Build über
 das Limit, beendet der Kernel nur einen Compiler im Container und nicht Prozesse des Hosts. Unraid läuft aus dem RAM
 und hat normalerweise keinen Swap, deshalb ist das Limit wichtig. Ein abgebrochener Build lässt sich einfach neu
@@ -84,7 +84,8 @@ Im Spiel selbst öffnet Touchpad-Klick + Options auf dem DualSense dasselbe Inse
 | `UPLOAD_NUP` | `false` | `.nup` beim Deploy mitkopieren |
 | `AUTO_DEPLOY` | `false` | nach „Alles bauen“ automatisch deployen |
 | `RUN_ON_START` | `false` | beim Containerstart sofort bauen |
-| `JOBS` | Kerne − 2, höchstens (freier RAM bzw. Speicherlimit) ÷ 4 GB | parallele Compiler-Jobs |
+| `JOBS` | Kerne − 2, höchstens (freier RAM bzw. Speicherlimit) ÷ 3 GB | Spiel-Dateien gleichzeitig |
+| `BUILD_PAR` | Kerne − 2, höchstens (freier RAM bzw. Speicherlimit) ÷ 1 GB | ninja/make beim RADV-, FFmpeg- und zstd-Build |
 | `FORCE_DEPLOY` | `false` | alle Dateien neu hochladen |
 
 Kommandozeile ohne Web-UI: `docker exec -it hookshot-ps5-builder /app/scripts/build.sh all` (oder `update`,

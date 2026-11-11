@@ -1,0 +1,3 @@
+#!/bin/sh
+# (hookshot-ps5-builder) PS5_Vulkan/tools/build-radv.sh nimmt $NINJA; ninja allein startet Kerne+2 Compiler
+exec ninja -j "${BUILD_PAR:-2}" "$@"

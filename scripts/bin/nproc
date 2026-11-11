@@ -1,0 +1,3 @@
+#!/bin/sh
+# (hookshot-ps5-builder) make -j"$(nproc)" in den Build-Skripten (FFmpeg, zstd, SDK) auf das Speicherbudget begrenzen
+exec echo "${BUILD_PAR:-$(/usr/bin/nproc "$@")}"
